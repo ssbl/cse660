@@ -10,13 +10,13 @@ import matplotlib.pyplot as plt
 def create_dataset_pair(n):
     D = [random.randint(1, 50) for _ in range(n)]
 
-    i = random.randrange(n)
+    k = random.randrange(n)
     D_ = D[:]
 
-    while D_[i] == D[i]:
-        D_[i] = random.randint(1, 50)
+    while D_[k] == D[k]:
+        D_[k] = random.randint(1, 50)
 
-    return D, D_
+    return k, D, D_
 
 def predicate(D):
     return [d % 2 for d in D]
@@ -45,7 +45,7 @@ def rr(D, q, e):
     q_result = q(D)
     S = biased_predicate(q_result, e)
 
-    return sum(S) / len(S)
+    return S
 
 def round_float(x):
     string = '{:.2f}'.format(x)
@@ -63,7 +63,7 @@ def accuracy():
     alpha = p * math.sqrt(math.log(2 / beta) / (2*n))
     print(alpha)
 
-    D, D_ = create_dataset_pair(n)
+    k, D, D_ = create_dataset_pair(n)
     nruns = range(1, 1000)
 
     dq = no_noise_query(D, predicate)
@@ -71,30 +71,36 @@ def accuracy():
     D__results = [rr(D_, predicate, e) for _ in nruns]
 
 def privacy_loss():
-    n = 100
+    n = 10
     e = 0.1
 
-    D, D_ = create_dataset_pair(n)
-    nruns = range(1, 1000)
-    
-    sum_so_far = 0
-    result, result_ = [], []
-    for i in nruns:
-        x = round_float(rr(D, predicate, e))
-        y = round_float(rr(D_, predicate, e))
-        sum_so_far += x
+    k, D, D_ = create_dataset_pair(n)
+    iterations = range(1, 100000)
 
-        result.append(x)
-        result_.append(y)
+    losses = []
+    q_count, q__count = 0, 0
 
-    print(math.exp(e))
-    print(math.exp(-e))
-    h1 = plt.hist(result, bins=25)
-    h2 = plt.hist(result_, bins=25)
-    # plt.legend([h1, h2], ["RR(D)", "RR(D')"])
-    # plt.plot(nruns, result)
+    for i in iterations:
+        S = rr(D, predicate, e)
+        S_ = rr(D_, predicate, e)
+        q = predicate(D)
+        q_ = predicate(D_)
+        if q[k] != q_[k]:
+            if S[k] == q[k]:
+                q_count += 1
+            if S[k] == q_[k]:
+                q__count += 1
+        if q__count and q_count:
+            result = math.log(1.0 * q_count / q__count)
+            losses.append(result)
+
+    plt.plot(range(len(losses)), losses)
     plt.show()
 
+if __name__ == '__main__':
+    privacy_loss()
+
+'''
 if __name__ == '__main__':
     n = 100
     e = 0.1
@@ -159,3 +165,4 @@ if __name__ == '__main__':
     # plt.legend([h1, h2], ["RR(D)", "RR(D')"])
     # plt.plot(nruns, result)
     plt.show()
+'''
