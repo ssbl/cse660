@@ -6,6 +6,8 @@ import time
 from collections import defaultdict
 
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+
 
 def create_dataset_pair(n):
     D = [random.randint(1, 50) for _ in range(n)]
@@ -47,13 +49,19 @@ def rr(D, q, e):
 
     return S
 
+def rr_sum(D, q, e):
+    q_result = q(D)
+    S = biased_predicate(q_result, e)
+
+    return sum(S)/len(S)
+
 def round_float(x):
     string = '{:.2f}'.format(x)
     return float(string)
 
 def accuracy():
-    n = 100
-    e = 0.1
+    n = 10000
+    e = 0.5
     beta = 0.1
 
     # constants
@@ -61,21 +69,40 @@ def accuracy():
     q = 1 / (1 + math.exp(e))
 
     alpha = p * math.sqrt(math.log(2 / beta) / (2*n))
-    print(alpha)
+    print('alpha'+str(alpha))
 
     k, D, D_ = create_dataset_pair(n)
     nruns = range(1, 1000)
 
     dq = no_noise_query(D, predicate)
-    D_results = [rr(D, predicate, e) for _ in nruns]
-    D__results = [rr(D_, predicate, e) for _ in nruns]
+    D_results = [rr_sum(D, predicate, e) for _ in nruns]
+    abs_error = [abs((p*(d-q))-dq) for d in D_results]
+    error = [(p*(d-q))-dq for d in D_results]
+    outside_alpha = []
+    for e in abs_error:
+        if e >= alpha:
+            outside_alpha.append(1)
+        else:
+            outside_alpha.append(0)
+    points_outside_alpha = sum(outside_alpha)
+    i = plt.figure(3)
+    plt.axhline(0, color='g')
+    alpha_line = plt.axhline(alpha, color='r')
+    alpha_line2 = plt.axhline(-alpha, color='r')
+    plt.plot(error, 'go')
+    plt.xlabel('Nth run');
+    plt.ylabel('Error');
+    plt.legend([alpha_line],['alpha = '+'{:.2f}'.format(alpha)])
+    print('points outside alpha = '+str(points_outside_alpha))
+    # plt.show()
+    i.show()
 
 def privacy_loss():
-    n = 10
-    e = 0.1
+    n = 100
+    e = 0.5
 
     k, D, D_ = create_dataset_pair(n)
-    iterations = range(1, 100000)
+    iterations = range(1, 10000)
 
     losses = []
     q_count, q__count = 0, 0
@@ -94,11 +121,45 @@ def privacy_loss():
             result = math.log(1.0 * q_count / q__count)
             losses.append(result)
 
+    print(len(losses))
+    f = plt.figure(1)
     plt.plot(range(len(losses)), losses)
-    plt.show()
+    legend_patch = mpatches.Patch(color='blue', label='privacy loss for epsilon = '+str(e))
+    plt.legend(handles=[legend_patch])
+    f.show()
+    # plt.show()
+
+def privacy_loss_histogram():
+    n = 100
+    e = 0.5
+    k, D, D_ = create_dataset_pair(n)
+    nruns = range(1, 1000)
+    sum_so_far = 0
+    result, result_ = [], []
+    for i in nruns:
+        x = round_float(rr_sum(D, predicate, e))
+        y = round_float(rr_sum(D_, predicate, e))
+        sum_so_far += x
+
+        result.append(x)
+        result_.append(y)
+
+    g = plt.figure(2)
+    h1 = plt.hist(result, bins=25)
+    h2 = plt.hist(result_, bins=25)
+
+    # plt.legend([h1, h2], ["RR(D)", "RR(D')"])
+    # plt.plot(nruns, result)
+
+    g.show()
+    # plt.show()
+    
 
 if __name__ == '__main__':
     privacy_loss()
+    privacy_loss_histogram()
+    accuracy()
+    input()
 
 '''
 if __name__ == '__main__':
