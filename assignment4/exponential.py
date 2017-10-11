@@ -32,7 +32,7 @@ def score(D, r):
 
 def generate_probabilities(D, u, R, epsilon):
     results = [np.exp((epsilon * u(D, r)) / 2.0) for r in R]
-    print(results)
+    # print(results)
     total = sum(results)
 
     return [1.0 * x / total for x in results]
@@ -76,13 +76,18 @@ def accuracy():
     print('beta = {}'.format(beta))
     print(1.0 * count / iterations)
     plt.plot(diffs, 'go')
+    plt.axhline(alpha, color='r')
+    plt.axhline(alpha, color='r')
     plt.xlabel('Nth run')
     plt.ylabel('error')
     plt.show()
 
 if __name__ == '__main__':
+    #Exponential Mechanism
     privacy_loss()
     accuracy()
+
+    #Report One-Sided Noisy Arg Max
     e = 0.5
     beta = 0.1
     iterations = 10000

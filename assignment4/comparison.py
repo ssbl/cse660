@@ -4,7 +4,7 @@ import laplace
 import rr
 
 
-def compare_plots(n=100, beta=0.05, epsilon=0.5):
+def compare_plots(n=1000, beta=0.05, epsilon=0.5):
     error_rr, calculated_beta_rr, alpha_rr = rr.accuracy(epsilon, n, beta)
     error_lp, calculated_beta_lp, alpha_lp = laplace.accuracy(epsilon, n, beta)
 
