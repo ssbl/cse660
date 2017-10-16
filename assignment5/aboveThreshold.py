@@ -5,7 +5,7 @@ def create_dataset_pair(n,nbits):
     columns = []
     for i in range(nbits):
         columns.append(np.random.randint(2, size=n))
-    
+
     D = list(zip(*columns))
     return D
 
@@ -23,7 +23,7 @@ def above_threshold(D, query_list, T, epsilon):
         if  counting_query(D, query) + vi >= T_:
             result.append(True)
             break
-            
+
         else:
             result.append(False)
     return result
@@ -34,7 +34,7 @@ def sigmaE(c,e):
 def multiple_above_threshold(D, query_list, T, epsilon, c):
     e1 = 8.0/9 * epsilon
     e2 = 2.0/9 * epsilon
-    
+
     T_noise = np.random.laplace(scale=sigmaE(c,e1))
     count = 0
     result = []
@@ -56,7 +56,7 @@ def multiple_above_threshold(D, query_list, T, epsilon, c):
 def create_queries(n,nbits):
     a = np.arange(2**nbits)
     np.random.shuffle(a)
-    return [tuple(map(int,bin(d)[2:].rjust(nbits,'0'))) for d in a]
+    return [tuple(map(int,bin(d)[2:].rjust(nbits,'0'))) for d in a[:n]]
 
 if __name__ == '__main__':
     n = 1000
@@ -77,7 +77,7 @@ if __name__ == '__main__':
             # result = multiple_above_threshold(D, query_list, T , epsilon, 10)
             result_len = len(result)
             k = result_len
-            alpha = 8*(np.log(k)-np.log(2/beta))/epsilon    
+            alpha = 8*(np.log(k)-np.log(2/beta))/epsilon
 
             for j in range(result_len):
                 if result[j] == False:
@@ -90,8 +90,3 @@ if __name__ == '__main__':
                         break
 
         print('calc beta', violations/nturns)
-
-
-
-
-
