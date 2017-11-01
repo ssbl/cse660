@@ -62,7 +62,8 @@ if __name__ == '__main__':
     error_standard = []
     error_advanced = []
     error_mwem = []
-    for nq in range(50, 250, 5):
+    iterations = range(50, 250, 5)
+    for nq in iterations:
         Q = create_queries(nq, nbits)
         qDs = counting_queries(D, Q)
         qDs_composition = composition(D, counting_queries, Q, budget)
@@ -80,8 +81,13 @@ if __name__ == '__main__':
     # plt.plot(qDs, label='none')
     # plt.plot(qDs_composition, label='standard')
     # plt.plot(qDs_advanced, label='advanced')
-    plt.plot(error_standard, label='standard')
-    plt.plot(error_advanced, label='advanced')
-    plt.plot(error_mwem, label='MWEM')
+    plt.plot(iterations, error_standard, label='standard')
+    plt.plot(iterations, error_advanced, label='advanced')
+    plt.plot(iterations, error_mwem, label='MWEM')
+
+    ax = plt.gca()
+    ax.set_xlabel('number of queries')
+    ax.set_ylabel('max error')
+
     plt.legend()
     plt.show()
