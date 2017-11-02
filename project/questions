@@ -1,0 +1,9 @@
+1. how does one query look like
+1. what should be the value of k, should k be all possible values of queries
+3. should s queries be unique
+4. what is q_tilde, is this just one query after summing up s number of queries from {qi}, how do you take sum of queries
+Q. what is u_i and v_j, does u_i mean its a possible qabc
+5. why are we maximizing v_j?
+6. when we get a sample query set {qi} of size s, and when we are building u_i, do we consider the positive version of the negative queries that we sampled, and when we are building v_j, do we consider the negative version of the positive queries that we found in sample
+7. How to formulate CPLEX equations for our constraints
+
