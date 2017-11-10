@@ -1,0 +1,67 @@
+dual query:
+
+D = generate database
+Q = generate queries
+Q1 = convert_to_frequency(Q)
+calc T = ..., eta = ..., s = ....
+
+For t=1...T
+	sampled_queries = []
+	for i=1...s
+		sampled_queries.append(np.random.choice(Q,Q1))
+
+	positive_queries = 0, negative_queries = 0
+	for(q in s):
+		if(q0==1)
+			positive_queries++
+		else
+			negative_queries++
+
+
+	matrix = []
+	rhs_vector = []
+	count_positive = 1
+	count_negative = 1
+	for q in s:
+		equation = []
+		rhs = 0
+		if(q0 == 1) //positive query
+			equation = q[1:len(q)] + [(count_positive-1) number of zeroes] + [-3] + [(positive_queries - count_positive) number of zeroes] + [negative_queries number of zeroes]
+			count_positive++
+			rhs = 0
+		else
+			equation = change_1_to_-1 (q[1:len(q)]) + [positive_queries number of zeroes] + [(count_negative-1) number of zeroes] + [-1] +[(negative_queries - count_negative )number of zeroes]
+			count_negative++
+			rhs = -3
+		count++
+
+		//TODO: INVERT THIS SO THAT IT RUNS ON SCIPY SOLVER
+		matrix.append(equation)
+		rhs_vector(rhs)
+
+	//SOLVE THE MATRIX
+	c = [d number of zeroes] + [positive_queries number of 1s] + [negative_queries number of 1s]
+	A = matrix
+	b = rhs_vector
+
+	bounds_vector = new int[d+s] 
+
+	for(int i=0; i<d; i++) {
+		bounds_vector[i] = [None, None]
+	}
+
+	res = linprog(c, A_ub = A, b_ub = rhs_vector, bounds = (bounds_vector), options = {"disp":True})
+
+	
+
+
+
+
+
+q = 1/0| d1 .... dd  (d+1)
+
+if(q0 == 1)  //positive query
+equation = d0.. d2 .... dd -3 0 0 0 ... 0(s-1 zeroes) 0 0 .... 0(s zeroes) >= 0    wehre di == 1 if q i+1 == 1
+else
+equation= d0 ...       dd  0 0 ........0(s zeroes)  -1 0 .... 0(s-1 zeroes) >= -3 where di == -1 if q i+1 == 1
+

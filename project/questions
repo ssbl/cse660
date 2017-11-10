@@ -1,5 +1,5 @@
-1. how does one query look like
-1. what should be the value of k, should k be all possible values of queries
+1. how does one query look 1
+like. what should be the value of k, should k be all possible values of queries
 3. should s queries be unique
 4. what is q_tilde, is this just one query after summing up s number of queries from {qi}, how do you take sum of queries
 Q. what is u_i and v_j, does u_i mean its a possible qabc
