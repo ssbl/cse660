@@ -74,6 +74,66 @@ def print_result(x, c, d):
     for dvar in d:
         print(dvar.varValue)
 
+def run_experiment(eta, steps, samples, n):
+    print('steps =', steps, 'eta =', eta, 'samples =', samples)
+
+    synthetic_db = []
+    for t in range(steps):
+        print('step {}/{}'.format(t + 1, steps))
+        sampled_queries = np.array(sample_queries(Q, Qdist, samples))
+
+        npositive = nnegative = 0
+        for query in sampled_queries:
+            if query[0]:
+                nnegative += 1
+            else:
+                npositive += 1
+
+        model = pulp.LpProblem('Dual Query', pulp.LpMaximize)
+        x = np.array([pulp.LpVariable('x' + str(i), cat='Binary') for i in range(nbits)])
+        c = np.array([pulp.LpVariable('c' + str(i), cat='Binary') for i in range(npositive)])
+        d = np.array([pulp.LpVariable('d' + str(i), cat='Binary') for i in range(nnegative)])
+
+        model += sum(c) + sum(d), 'Objective function'
+
+        countp = countn = 0
+        for query in sampled_queries:
+            vars = []
+            for i in range(3):
+                col = query[1 + i]
+                complement = query[4 + i]
+                vars.append(1 - x[col] if complement else x[col])
+            if not query[0]:
+                model += sum(vars) - 3 * c[countp] >= 0
+                countp += 1
+            else:
+                model += -sum(vars) - d[countn] + 3 >= 0
+                countn += 1
+        model.solve()
+
+        # Using valueOrDefault to avoid dealing with None values in xt
+        xt = np.array([xvar.valueOrDefault() for xvar in x])
+
+        for i in range(len(Q)):
+            Qdist[i] = np.exp(-eta * payoff(D, Q[i], xt)) * Qdist[i]
+        psum = sum(Qdist)
+
+        Qdist /= psum
+
+        synthetic_db.append(xt)
+
+    pprint(synthetic_db)
+
+    result = []
+    max_error = avg_error = 0
+    for query in Q:
+        diff = query_3marginal_db(D, query) - query_3marginal_db(synthetic_db, query)
+        max_error = max(max_error, abs(diff))
+        avg_error += abs(diff)
+        result.append(diff)
+
+    print('max error = {}, average error = {}'.format(max_error, avg_error / len(result)))
+
 if __name__ == '__main__':
     n = 5000
     nbits = 10
@@ -89,9 +149,9 @@ if __name__ == '__main__':
     # steps = (16 * np.log(len(Q))) / alpha**2
     # eta = alpha / 4
     # samples = (48 * np.log(2 * (2**nbits) * steps / beta)) / alpha**2
-    steps = 10
-    eta = 3.0
-    samples = 5
+    steps = 30
+    eta = 4.0
+    samples = 15
     print('steps =', steps, 'eta =', eta, 'samples =', samples)
 
     synthetic_db = []
@@ -140,6 +200,9 @@ if __name__ == '__main__':
         model.solve()
         # Using valueOrDefault to avoid dealing with None values in xt
         xt = np.array([xvar.valueOrDefault() for xvar in x])
+        # print(xt)
+        # print_result(x, c, d)
+        # exit(0)
 
         for i in range(len(Q)):
             Qdist[i] = np.exp(-eta * payoff(D, Q[i], xt)) * Qdist[i]
@@ -169,5 +232,5 @@ if __name__ == '__main__':
 
     # plt.plot(result_D, color='g')
     # plt.plot(result_synthetic, color='r')
-    plt.plot(result)
-    plt.show()
+    # plt.plot(result)
+    # plt.show()
