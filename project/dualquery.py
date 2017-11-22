@@ -64,9 +64,17 @@ def query_3marginal_db(D, query):
 def payoff(D, q, x):
     return query_3marginal(x, q) - query_3marginal_db(D, q)
 
+def print_result(x, c, d):
+    for xvar in x:
+        print(xvar.varValue)
+    print('=== c ===')
+    for cvar in c:
+        print(cvar.varValue)
+    print('=== d ===')
+    for dvar in d:
+        print(dvar.varValue)
+
 if __name__ == '__main__':
-    # 1. fix payoff DONE
-    # 2. manually choose queries
     n = 5000
     nbits = 10
     nqueries = nC3(nbits)
@@ -74,10 +82,10 @@ if __name__ == '__main__':
     # frequencies = get_frequencies(D, nbits)
     Q = create_queries(nqueries, nbits)
     Qdist = np.array([1/len(Q) for _ in range(len(Q))])
-    epsilon = 0.5
-    beta = 0.05
-    delta = np.exp(-10)
-    alpha = 2.5
+    # epsilon = 0.5
+    # beta = 0.05
+    # delta = np.exp(-10)
+    # alpha = 2.5
     # steps = (16 * np.log(len(Q))) / alpha**2
     # eta = alpha / 4
     # samples = (48 * np.log(2 * (2**nbits) * steps / beta)) / alpha**2
@@ -90,6 +98,9 @@ if __name__ == '__main__':
     for t in range(steps):
         print('step {}...'.format(t), end='')
         sampled_queries = np.array(sample_queries(Q, Qdist, samples))
+        # sampled_queries = [[0, 0, 1, 2, 0, 0, 0],
+        #                    [0, 2, 3, 4, 0, 0, 0],
+        #                    [0, 2, 4, 5, 1, 0, 0]]
         print('sampled queries')
         pprint(sorted(map(tuple, sampled_queries)))
         # print(Qdist)
@@ -145,21 +156,18 @@ if __name__ == '__main__':
 
     # result_D = result_synthetic = []
     result = []
+    max_error = avg_error = 0
     for query in Q:
         diff = query_3marginal_db(D, query) - query_3marginal_db(synthetic_db, query)
+        max_error = max(max_error, abs(diff))
+        avg_error += abs(diff)
         result.append(diff)
         # result_D.append(query_3marginal_db(D, query))
         # result_synthetic.append(query_3marginal_db(synthetic_db, query))
+
+    print('max error = {}, average error = {}'.format(max_error, avg_error / len(result)))
 
     # plt.plot(result_D, color='g')
     # plt.plot(result_synthetic, color='r')
     plt.plot(result)
     plt.show()
-    # for xvar in x:
-    #     print(xvar.varValue)
-    # print('=== c ===')
-    # for cvar in c:
-    #     print(cvar.varValue)
-    # print('=== d ===')
-    # for dvar in d:
-    #     print(dvar.varValue)
