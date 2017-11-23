@@ -163,12 +163,12 @@ if __name__ == '__main__':
 
     eta = 2.7                   # fixed for now
     steps = 10
-    steps_max = 20
+    steps_max = 22
     samples = 5
-    samples_max = 15
+    samples_max = 20
 
-    for s in range(steps, steps_max + 1, 5):
-        for T in range(samples, samples_max + 1, 10):
+    for s in range(steps, steps_max + 1, 2):
+        for T in range(samples, samples_max + 1, 3):
             run_experiment(eta=eta, steps=T, samples=s, D=D, Q=Q)
 
     # plt.plot(result_D, color='g')
