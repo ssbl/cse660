@@ -147,8 +147,9 @@ def run_experiment(eta, steps, samples, D, Q):
             'samples': samples,
             'max_error': max_error,
             'avg_error': avg_error,
-            'synthetic_db': str(synthetic_db),
+            # 'synthetic_db': str(synthetic_db),
             'runtime': runtime,
+            'n': n,
         }
 
         log.write(json.dumps(dump, sort_keys=True) + '\n')
