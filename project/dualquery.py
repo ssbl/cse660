@@ -1,5 +1,7 @@
 import itertools
-from pprint import pprint
+import json
+from pprint import pprint, pformat
+from time import time
 
 import pulp
 import numpy as np
@@ -74,10 +76,13 @@ def print_result(x, c, d):
     for dvar in d:
         print(dvar.varValue)
 
-def run_experiment(eta, steps, samples, n):
+def run_experiment(eta, steps, samples, D, Q):
+    n = len(D)
+    Qdist = np.array([1/len(Q) for _ in range(len(Q))])
     print('steps =', steps, 'eta =', eta, 'samples =', samples)
 
     synthetic_db = []
+    start = time()
     for t in range(steps):
         print('step {}/{}'.format(t + 1, steps))
         sampled_queries = np.array(sample_queries(Q, Qdist, samples))
@@ -122,113 +127,48 @@ def run_experiment(eta, steps, samples, n):
 
         synthetic_db.append(xt)
 
-    pprint(synthetic_db)
+    runtime = time() - start
 
     result = []
     max_error = avg_error = 0
     for query in Q:
-        diff = query_3marginal_db(D, query) - query_3marginal_db(synthetic_db, query)
+        diff = query_3marginal_db(D, query) \
+               - query_3marginal_db(synthetic_db, query)
         max_error = max(max_error, abs(diff))
         avg_error += abs(diff)
         result.append(diff)
 
-    print('max error = {}, average error = {}'.format(max_error, avg_error / len(result)))
+    avg_error /= len(result)
+
+    with open('log.json', 'a') as log:
+        dump = {
+            'steps': steps,
+            'eta': eta,
+            'samples': samples,
+            'max_error': max_error,
+            'avg_error': avg_error,
+            'synthetic_db': str(synthetic_db),
+            'runtime': runtime,
+        }
+
+        log.write(json.dumps(dump, sort_keys=True) + '\n')
 
 if __name__ == '__main__':
     n = 5000
     nbits = 10
     nqueries = nC3(nbits)
     D = create_dataset(n, nbits)
-    # frequencies = get_frequencies(D, nbits)
     Q = create_queries(nqueries, nbits)
-    Qdist = np.array([1/len(Q) for _ in range(len(Q))])
-    # epsilon = 0.5
-    # beta = 0.05
-    # delta = np.exp(-10)
-    # alpha = 2.5
-    # steps = (16 * np.log(len(Q))) / alpha**2
-    # eta = alpha / 4
-    # samples = (48 * np.log(2 * (2**nbits) * steps / beta)) / alpha**2
-    steps = 30
-    eta = 4.0
-    samples = 15
-    print('steps =', steps, 'eta =', eta, 'samples =', samples)
 
-    synthetic_db = []
-    for t in range(steps):
-        print('step {}...'.format(t), end='')
-        sampled_queries = np.array(sample_queries(Q, Qdist, samples))
-        # sampled_queries = [[0, 0, 1, 2, 0, 0, 0],
-        #                    [0, 2, 3, 4, 0, 0, 0],
-        #                    [0, 2, 4, 5, 1, 0, 0]]
-        print('sampled queries')
-        pprint(sorted(map(tuple, sampled_queries)))
-        # print(Qdist)
-        # print('..............................')
+    eta = 2.7                   # fixed for now
+    steps = 10
+    steps_max = 20
+    samples = 5
+    samples_max = 15
 
-        npositive = nnegative = 0
-        for query in sampled_queries:
-            if query[0]:
-                nnegative += 1
-            else:
-                npositive += 1
-        # print('positive =', npositive, 'negative =', nnegative)
-
-        model = pulp.LpProblem('Dual Query', pulp.LpMaximize)
-        x = np.array([pulp.LpVariable('x' + str(i), cat='Binary') for i in range(nbits)])
-        c = np.array([pulp.LpVariable('c' + str(i), cat='Binary') for i in range(npositive)])
-        d = np.array([pulp.LpVariable('d' + str(i), cat='Binary') for i in range(nnegative)])
-        # print(model)
-
-        model += sum(c) + sum(d), 'Objective function'
-
-        countp = countn = 0
-        for query in sampled_queries:
-            vars = []
-            for i in range(3):
-                col = query[1 + i]
-                complement = query[4 + i]
-                vars.append(1 - x[col] if complement else x[col])
-            if not query[0]:
-                # model += np.dot(query[1:], x) - 3 * c[countp] >= 0
-                model += sum(vars) - 3 * c[countp] >= 0
-                countp += 1
-            else:
-                # model += np.dot(query[1:], -x) - d[countn] + 3 >= 0
-                model += -sum(vars) - d[countn] + 3 >= 0
-                countn += 1
-        model.solve()
-        # Using valueOrDefault to avoid dealing with None values in xt
-        xt = np.array([xvar.valueOrDefault() for xvar in x])
-        # print(xt)
-        # print_result(x, c, d)
-        # exit(0)
-
-        for i in range(len(Q)):
-            Qdist[i] = np.exp(-eta * payoff(D, Q[i], xt)) * Qdist[i]
-        psum = sum(Qdist)
-        # print(psum)
-        Qdist /= psum
-        # print(sum(Qdist))
-
-        synthetic_db.append(xt)
-        # print(model)
-        print('done.')
-
-    pprint(synthetic_db)
-
-    # result_D = result_synthetic = []
-    result = []
-    max_error = avg_error = 0
-    for query in Q:
-        diff = query_3marginal_db(D, query) - query_3marginal_db(synthetic_db, query)
-        max_error = max(max_error, abs(diff))
-        avg_error += abs(diff)
-        result.append(diff)
-        # result_D.append(query_3marginal_db(D, query))
-        # result_synthetic.append(query_3marginal_db(synthetic_db, query))
-
-    print('max error = {}, average error = {}'.format(max_error, avg_error / len(result)))
+    for s in range(steps, steps_max + 1, 5):
+        for T in range(samples, samples_max + 1, 10):
+            run_experiment(eta=eta, steps=T, samples=s, D=D, Q=Q)
 
     # plt.plot(result_D, color='g')
     # plt.plot(result_synthetic, color='r')
