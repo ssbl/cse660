@@ -7,3 +7,8 @@ Q. what is u_i and v_j, does u_i mean its a possible qabc
 6. when we get a sample query set {qi} of size s, and when we are building u_i, do we consider the positive version of the negative queries that we sampled, and when we are building v_j, do we consider the negative version of the positive queries that we found in sample
 7. How to formulate CPLEX equations for our constraints
 
+--------------------------
+how does epsilon affect the parameters T, eta, samples
+how to evaluate
+about generating queries, is generating columns randomly a good approach
+parameter tuning: how to choose
