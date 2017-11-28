@@ -204,8 +204,8 @@ if __name__ == '__main__':
     # samples = 5
     # samples_max = 20
 
-    for s in range(steps, steps_max + 1, steps_increment):
-        for T in range(samples, samples_max + 1, samples_increment):
+    for T in range(steps, steps_max + 1, steps_increment):
+        for s in range(samples, samples_max + 1, samples_increment):
             run_experiment(eta=eta, steps=T, samples=s, D=D, Q=Q)
 
     # plt.plot(result_D, color='g')
