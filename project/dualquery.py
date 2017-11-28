@@ -1,6 +1,8 @@
 import itertools
 import json
+from pickle import dump, load
 from pprint import pprint, pformat
+from sys import argv
 from time import time
 
 import pulp
@@ -76,6 +78,22 @@ def print_result(x, c, d):
     for dvar in d:
         print(dvar.varValue)
 
+def get_queries(nqueries, nbits):
+    result = []
+
+    signs = [0, 1]
+    columns = set()
+    while len(columns) < nqueries:
+        triple = set()
+        while len(triple) < 3:
+            triple.add(np.random.randint(nbits))
+        triple = sorted(triple)
+        columns.add(tuple(triple))
+    complements = itertools.product(range(2), repeat=3)
+    result = itertools.product(columns, complements)
+    result = list(itertools.product(signs, result))
+    return [[x[0]] + list(itertools.chain(*x[1])) for x in result]
+
 def run_experiment(eta, steps, samples, D, Q):
     n = len(D)
     Qdist = np.array([1/len(Q) for _ in range(len(Q))])
@@ -129,6 +147,7 @@ def run_experiment(eta, steps, samples, D, Q):
 
     runtime = time() - start
 
+    # TODO: set free variables in heuristically
     result = []
     max_error = avg_error = 0
     for query in Q:
@@ -155,20 +174,38 @@ def run_experiment(eta, steps, samples, D, Q):
         log.write(json.dumps(dump, sort_keys=True) + '\n')
 
 if __name__ == '__main__':
-    n = 5000
-    nbits = 10
-    nqueries = nC3(nbits)
-    D = create_dataset(n, nbits)
-    Q = create_queries(nqueries, nbits)
+    argc = len(argv)
+    if argc != 2:
+        print('usage: dualquery <pickle-file>')
+        exit(1)
+
+    # n = 5000
+    # nbits = 10
+    # nqueries = nC3(nbits)
+    # D = create_dataset(n, nbits)
+    pickle_file = argv[1]
+    D = load(open(pickle_file, 'rb'))
+    n = len(D)
+    nbits = len(D[0])
+    nqueries = 50
+    print('n = {}, nbits = {}, nqueries = {}'.format(n, nbits, nqueries))
+    # Q = create_queries(nqueries, nbits)
+    Q = get_queries(nqueries, nbits)
 
     eta = 2.7                   # fixed for now
-    steps = 10
-    steps_max = 22
-    samples = 5
-    samples_max = 20
+    steps = 20
+    steps_max = 50
+    steps_increment = 5
+    samples = 10
+    samples_max = 75
+    samples_increment = 13
+    # steps = 10
+    # steps_max = 22
+    # samples = 5
+    # samples_max = 20
 
-    for s in range(steps, steps_max + 1, 2):
-        for T in range(samples, samples_max + 1, 3):
+    for s in range(steps, steps_max + 1, steps_increment):
+        for T in range(samples, samples_max + 1, samples_increment):
             run_experiment(eta=eta, steps=T, samples=s, D=D, Q=Q)
 
     # plt.plot(result_D, color='g')
