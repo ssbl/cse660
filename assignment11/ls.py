@@ -48,7 +48,7 @@ if __name__ == '__main__':
             print('Running LapMech for n = {}, query = {}, LS = {}'.format(
                 n, query_desc, lsval))
             error_gs.append(abs(qD - lapmech(D, qD, epsilon, gs)))
-            error_ls.append(abs(qD - lapmech(D, qD, epsilon, ls(D, query))))
+            error_ls.append(abs(qD - lapmech(D, qD, epsilon, lsval)))
 
     # Error when using LS turns out to be very low.
     plt.plot(error_gs, 'ro', label='global')
