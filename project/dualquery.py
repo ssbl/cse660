@@ -3,12 +3,14 @@ import json
 from pickle import dump, load
 from pprint import pprint, pformat
 from sys import argv
-from time import time
+from time import time, strftime
 
 import pulp
 import numpy as np
 import matplotlib.pyplot as plt
 
+
+cache = {}
 
 def create_dataset(n,nbits):
     columns = []
@@ -65,8 +67,11 @@ def query_3marginal(row, query):
 def query_3marginal_db(D, query):
     return sum([query_3marginal(row, query) for row in D]) / len(D)
 
+def query_3marginal_db_cached(query):
+    return cache[query]
+
 def payoff(D, q, x):
-    return query_3marginal(x, q) - query_3marginal_db(D, q)
+    return query_3marginal(x, q) - query_3marginal_db_cached(q)
 
 def print_result(x, c, d):
     for xvar in x:
@@ -92,9 +97,9 @@ def get_queries(nqueries, nbits):
     complements = itertools.product(range(2), repeat=3)
     result = itertools.product(columns, complements)
     result = list(itertools.product(signs, result))
-    return [[x[0]] + list(itertools.chain(*x[1])) for x in result]
+    return [tuple([x[0]] + list(itertools.chain(*x[1]))) for x in result]
 
-def run_experiment(eta, steps, samples, D, Q):
+def run_experiment(eta, steps, samples, D, Q, start_time):
     n = len(D)
     Qdist = np.array([1/len(Q) for _ in range(len(Q))])
     print('steps =', steps, 'eta =', eta, 'samples =', samples)
@@ -151,7 +156,7 @@ def run_experiment(eta, steps, samples, D, Q):
     result = []
     max_error = avg_error = 0
     for query in Q:
-        diff = query_3marginal_db(D, query) \
+        diff = query_3marginal_db_cached(query) \
                - query_3marginal_db(synthetic_db, query)
         max_error = max(max_error, abs(diff))
         avg_error += abs(diff)
@@ -159,7 +164,7 @@ def run_experiment(eta, steps, samples, D, Q):
 
     avg_error /= len(result)
 
-    with open('log.json', 'a') as log:
+    with open('log_{}.json'.format(start_time), 'a') as log:
         dump = {
             'steps': steps,
             'eta': eta,
@@ -172,6 +177,11 @@ def run_experiment(eta, steps, samples, D, Q):
         }
 
         log.write(json.dumps(dump, sort_keys=True) + '\n')
+
+def cache_results(D, Q):
+    c = cache
+    for query in Q:
+        c[query] = query_3marginal_db(D, query)
 
 if __name__ == '__main__':
     argc = len(argv)
@@ -192,11 +202,13 @@ if __name__ == '__main__':
     # Q = create_queries(nqueries, nbits)
     Q = get_queries(nqueries, nbits)
 
+    cache_results(D, Q)
+
     eta = 2.7                   # fixed for now
-    steps = 20
-    steps_max = 50
-    steps_increment = 5
-    samples = 10
+    steps = 12
+    steps_max = 80
+    steps_increment = 4
+    samples = 30
     samples_max = 75
     samples_increment = 13
     # steps = 10
@@ -204,9 +216,11 @@ if __name__ == '__main__':
     # samples = 5
     # samples_max = 20
 
+    t = strftime('%m-%d-%H-%M-%S')
+    # run_experiment(eta=eta, steps=steps, samples=samples, D=D, Q=Q, start_time=t)
     for T in range(steps, steps_max + 1, steps_increment):
-        for s in range(samples, samples_max + 1, samples_increment):
-            run_experiment(eta=eta, steps=T, samples=s, D=D, Q=Q)
+        for s in range(samples, samples + 1, samples_increment):
+            run_experiment(eta=eta, steps=T, samples=s, D=D, Q=Q, start_time=t)
 
     # plt.plot(result_D, color='g')
     # plt.plot(result_synthetic, color='r')
