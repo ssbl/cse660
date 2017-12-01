@@ -1,5 +1,6 @@
 import itertools
 import json
+from pathlib import Path
 from pickle import dump, load
 from pprint import pprint, pformat
 from sys import argv
@@ -99,7 +100,7 @@ def get_queries(nqueries, nbits):
     result = list(itertools.product(signs, result))
     return [tuple([x[0]] + list(itertools.chain(*x[1]))) for x in result]
 
-def run_experiment(eta, steps, samples, D, Q, start_time):
+def run_experiment(eta, steps, samples, D, Q):
     n = len(D)
     Qdist = np.array([1/len(Q) for _ in range(len(Q))])
     print('steps =', steps, 'eta =', eta, 'samples =', samples)
@@ -163,17 +164,50 @@ def run_experiment(eta, steps, samples, D, Q, start_time):
         result.append(diff)
 
     avg_error /= len(result)
+    return {
+        'average': avg_error,
+        'max': max_error,
+        'runtime': runtime
+    }
+
+    # with open('log_{}.json'.format(start_time), 'a') as log:
+    #     dump = {
+    #         'steps': steps,
+    #         'eta': eta,
+    #         'samples': samples,
+    #         'max_error': max_error,
+    #         'avg_error': avg_error,
+    #         'runtime': runtime,
+    #         'n': n,
+    #     }
+
+    #     log.write(json.dumps(dump, sort_keys=True) + '\n')
+
+def average_nexperiments(n, start_time, **args):
+    avg_error = 0
+    max_error = 0
+    runtime = 0
+
+    for i in range(1, n + 1):
+        print('run {}'.format(i))
+        result = run_experiment(**args)
+        avg_error += result['average']
+        max_error += result['max']
+        runtime += result['runtime']
+
+    max_error /= n
+    avg_error /= n
+    runtime /= n
 
     with open('log_{}.json'.format(start_time), 'a') as log:
         dump = {
-            'steps': steps,
-            'eta': eta,
-            'samples': samples,
+            'steps': args['steps'],
+            'eta': args['eta'],
+            'samples': args['samples'],
             'max_error': max_error,
             'avg_error': avg_error,
-            # 'synthetic_db': str(synthetic_db),
             'runtime': runtime,
-            'n': n,
+            'n': len(args['D'])
         }
 
         log.write(json.dumps(dump, sort_keys=True) + '\n')
@@ -182,6 +216,18 @@ def cache_results(D, Q):
     c = cache
     for query in Q:
         c[query] = query_3marginal_db(D, query)
+
+def calculate_nsamples(eps_min, eps_max, eps_steps, eta, steps, nrows):
+    eps_increment = (eps_max - eps_min) / (eps_steps - 1)
+
+    result = []
+
+    for i in range(eps_steps):
+        current_eps = eps_min + i * eps_increment
+        s = (current_eps * nrows) / (eta * steps * (steps - 1))
+        result.append(s)
+
+    return result
 
 if __name__ == '__main__':
     argc = len(argv)
@@ -199,10 +245,22 @@ if __name__ == '__main__':
     nbits = len(D[0])
     nqueries = 50
     print('n = {}, nbits = {}, nqueries = {}'.format(n, nbits, nqueries))
-    # Q = create_queries(nqueries, nbits)
-    Q = get_queries(nqueries, nbits)
 
-    cache_results(D, Q)
+    cachefile = 'qcache_{}_{}.p'.format(n, nbits)
+    if Path(cachefile).exists():
+        print('Found cache file: {}'.format(cachefile))
+        start = time()
+        cache = load(open(cachefile, 'rb'))
+        Q = list(cache.keys())
+        print('Read cache file in {}s'.format(time() - start))
+    else:
+        Q = get_queries(nqueries, nbits)
+        print('Creating cache..')
+        start = time()
+        cache_results(D, Q)
+        print('Generated cache in {}s'.format(time() - start))
+        with open(cachefile, 'wb') as cf:
+            dump(cache, cf)
 
     eta = 2.7                   # fixed for now
     steps = 12
@@ -220,7 +278,8 @@ if __name__ == '__main__':
     # run_experiment(eta=eta, steps=steps, samples=samples, D=D, Q=Q, start_time=t)
     for T in range(steps, steps_max + 1, steps_increment):
         for s in range(samples, samples + 1, samples_increment):
-            run_experiment(eta=eta, steps=T, samples=s, D=D, Q=Q, start_time=t)
+            # run_experiment(eta=eta, steps=T, samples=s, D=D, Q=Q, start_time=t)
+            average_nexperiments(3, t, eta=eta, steps=T, samples=s, D=D, Q=Q)
 
     # plt.plot(result_D, color='g')
     # plt.plot(result_synthetic, color='r')
