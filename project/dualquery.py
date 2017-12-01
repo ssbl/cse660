@@ -153,7 +153,6 @@ def run_experiment(eta, steps, samples, D, Q):
 
     runtime = time() - start
 
-    # TODO: set free variables in heuristically
     result = []
     max_error = avg_error = 0
     for query in Q:
@@ -169,19 +168,6 @@ def run_experiment(eta, steps, samples, D, Q):
         'max': max_error,
         'runtime': runtime
     }
-
-    # with open('log_{}.json'.format(start_time), 'a') as log:
-    #     dump = {
-    #         'steps': steps,
-    #         'eta': eta,
-    #         'samples': samples,
-    #         'max_error': max_error,
-    #         'avg_error': avg_error,
-    #         'runtime': runtime,
-    #         'n': n,
-    #     }
-
-    #     log.write(json.dumps(dump, sort_keys=True) + '\n')
 
 def average_nexperiments(n, start_time, **args):
     avg_error = 0
@@ -235,10 +221,6 @@ if __name__ == '__main__':
         print('usage: dualquery <pickle-file>')
         exit(1)
 
-    # n = 5000
-    # nbits = 10
-    # nqueries = nC3(nbits)
-    # D = create_dataset(n, nbits)
     pickle_file = argv[1]
     D = load(open(pickle_file, 'rb'))
     n = len(D)
@@ -280,8 +262,3 @@ if __name__ == '__main__':
         for s in range(samples, samples + 1, samples_increment):
             # run_experiment(eta=eta, steps=T, samples=s, D=D, Q=Q, start_time=t)
             average_nexperiments(3, t, eta=eta, steps=T, samples=s, D=D, Q=Q)
-
-    # plt.plot(result_D, color='g')
-    # plt.plot(result_synthetic, color='r')
-    # plt.plot(result)
-    # plt.show()
