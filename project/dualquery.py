@@ -108,7 +108,7 @@ def run_experiment(eta, steps, samples, D, Q):
     synthetic_db = []
     start = time()
     for t in range(steps):
-        print('step {}/{}'.format(t + 1, steps))
+        print('step {:3d}/{}'.format(t + 1, steps), end='\r', flush=True)
         sampled_queries = np.array(sample_queries(Q, Qdist, samples))
 
         npositive = nnegative = 0
@@ -151,6 +151,7 @@ def run_experiment(eta, steps, samples, D, Q):
 
         synthetic_db.append(xt)
 
+    print()
     runtime = time() - start
 
     result = []
@@ -215,6 +216,22 @@ def calculate_nsamples(eps_min, eps_max, eps_steps, eta, steps, nrows):
 
     return result
 
+def calculate_nsteps(eps_min, eps_max, eps_steps, eta, samples, nrows):
+    eps_increment = (eps_max - eps_min) / (eps_steps - 1)
+
+    result = []
+
+    for i in range(eps_steps):
+        current_eps = eps_min + i * eps_increment
+        x = (current_eps * nrows) / (eta * samples)
+        T1, T2 = np.roots([1, -1, x])
+        if T1 > 0:
+            result.append(int(T1))
+        if T2 > 0:
+            result.append(int(T2))
+
+    return result
+
 if __name__ == '__main__':
     argc = len(argv)
     if argc != 2:
@@ -225,10 +242,10 @@ if __name__ == '__main__':
     D = load(open(pickle_file, 'rb'))
     n = len(D)
     nbits = len(D[0])
-    nqueries = 50
+    nqueries = 10000
     print('n = {}, nbits = {}, nqueries = {}'.format(n, nbits, nqueries))
 
-    cachefile = 'qcache_{}_{}.p'.format(n, nbits)
+    cachefile = 'qcache_r-{}_c-{}_q-{}.p'.format(n, nbits, nqueries)
     if Path(cachefile).exists():
         print('Found cache file: {}'.format(cachefile))
         start = time()
@@ -236,14 +253,28 @@ if __name__ == '__main__':
         Q = list(cache.keys())
         print('Read cache file in {}s'.format(time() - start))
     else:
+        print('Generating queries...')
+        start = time()
         Q = get_queries(nqueries, nbits)
-        print('Creating cache..')
+        print('Created queries in {}s'.format(time() - start))
+        print('Creating cache...')
         start = time()
         cache_results(D, Q)
         print('Generated cache in {}s'.format(time() - start))
         with open(cachefile, 'wb') as cf:
             dump(cache, cf)
 
+    t = strftime('%m-%d-%H-%M-%S')
+    eta = 0.1
+    steps = 200
+    samples_list = calculate_nsamples(0.1, 5.0, 15, eta, steps, n)
+    # samples = 50
+    # steps_list = calculate_nsteps(0.1, 5.0, 15, eta, samples)
+    for samples in samples_list:
+        average_nexperiments(3, t, eta=eta, steps=steps,
+                             samples=samples, D=D, Q=Q)
+
+    '''
     eta = 2.7                   # fixed for now
     steps = 12
     steps_max = 80
@@ -256,9 +287,9 @@ if __name__ == '__main__':
     # samples = 5
     # samples_max = 20
 
-    t = strftime('%m-%d-%H-%M-%S')
     # run_experiment(eta=eta, steps=steps, samples=samples, D=D, Q=Q, start_time=t)
     for T in range(steps, steps_max + 1, steps_increment):
         for s in range(samples, samples + 1, samples_increment):
             # run_experiment(eta=eta, steps=T, samples=s, D=D, Q=Q, start_time=t)
             average_nexperiments(3, t, eta=eta, steps=T, samples=s, D=D, Q=Q)
+    '''
