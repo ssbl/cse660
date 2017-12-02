@@ -201,8 +201,13 @@ def average_nexperiments(n, start_time, **args):
 
 def cache_results(D, Q):
     c = cache
+    i = 1
+    n = len(Q)
     for query in Q:
         c[query] = query_3marginal_db(D, query)
+        print('query {}/{}'.format(i, n), end='\r', flush=True)
+        i += 1
+    print()
 
 def calculate_nsamples(eps_min, eps_max, eps_steps, eta, steps, nrows):
     eps_increment = (eps_max - eps_min) / (eps_steps - 1)
@@ -219,18 +224,18 @@ def calculate_nsamples(eps_min, eps_max, eps_steps, eta, steps, nrows):
 def calculate_nsteps(eps_min, eps_max, eps_steps, eta, samples, nrows):
     eps_increment = (eps_max - eps_min) / (eps_steps - 1)
 
-    result = []
+    result = set()
 
     for i in range(eps_steps):
         current_eps = eps_min + i * eps_increment
         x = (current_eps * nrows) / (eta * samples)
-        T1, T2 = np.roots([1, -1, x])
-        if T1 > 0:
-            result.append(int(T1))
-        if T2 > 0:
-            result.append(int(T2))
+        T1, T2 = np.roots([1, -1, -x]).real
+        if T1 >= 1:
+            result.add(int(T1))
+        if T2 >= 1:
+            result.add(int(T2))
 
-    return result
+    return list(result)
 
 if __name__ == '__main__':
     argc = len(argv)
@@ -242,7 +247,7 @@ if __name__ == '__main__':
     D = load(open(pickle_file, 'rb'))
     n = len(D)
     nbits = len(D[0])
-    nqueries = 10000
+    nqueries = 1000
     print('n = {}, nbits = {}, nqueries = {}'.format(n, nbits, nqueries))
 
     cachefile = 'qcache_r-{}_c-{}_q-{}.p'.format(n, nbits, nqueries)
@@ -266,11 +271,11 @@ if __name__ == '__main__':
 
     t = strftime('%m-%d-%H-%M-%S')
     eta = 0.1
-    steps = 200
-    samples_list = calculate_nsamples(0.1, 5.0, 15, eta, steps, n)
-    # samples = 50
-    # steps_list = calculate_nsteps(0.1, 5.0, 15, eta, samples)
-    for samples in samples_list:
+    # steps = 200
+    # samples_list = calculate_nsamples(0.1, 5.0, 15, eta, steps, n)
+    samples = 50
+    steps_list = calculate_nsteps(0.1, 5.0, 15, eta, samples, n)
+    for steps in steps_list:
         average_nexperiments(3, t, eta=eta, steps=steps,
                              samples=samples, D=D, Q=Q)
 
