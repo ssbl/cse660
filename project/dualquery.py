@@ -11,7 +11,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-cache = {}
+training_qcache = {}
+test_qcache = {}
 
 def create_dataset(n,nbits):
     columns = []
@@ -68,11 +69,11 @@ def query_3marginal(row, query):
 def query_3marginal_db(D, query):
     return sum([query_3marginal(row, query) for row in D]) / len(D)
 
-def query_3marginal_db_cached(query):
+def query_3marginal_db_cached(query, cache):
     return cache[query]
 
 def payoff(D, q, x):
-    return query_3marginal(x, q) - query_3marginal_db_cached(q)
+    return query_3marginal(x, q) - query_3marginal_db_cached(q, training_qcache)
 
 def print_result(x, c, d):
     for xvar in x:
@@ -95,12 +96,22 @@ def get_queries(nqueries, nbits):
             triple.add(np.random.randint(nbits))
         triple = sorted(triple)
         columns.add(tuple(triple))
-    complements = itertools.product(range(2), repeat=3)
-    result = itertools.product(columns, complements)
-    result = list(itertools.product(signs, result))
-    return [tuple([x[0]] + list(itertools.chain(*x[1]))) for x in result]
 
-def run_experiment(eta, steps, samples, D, Q):
+    columns = list(columns)
+    split_index = int(0.7 * nqueries)
+    test, training = columns[:split_index], columns[split_index:]
+
+    results = [test, training]
+    for i in range(len(results)):
+        datasplit = results[i]
+        complements = itertools.product(range(2), repeat=3)
+        result = itertools.product(datasplit, complements)
+        result = list(itertools.product(signs, result))
+        results[i] = [tuple([x[0]] + list(itertools.chain(*x[1]))) for x in result]
+
+    return results[0], results[1]
+
+def run_experiment(eta, steps, samples, D, Q, Qtest):
     n = len(D)
     Qdist = np.array([1/len(Q) for _ in range(len(Q))])
     print('steps =', steps, 'eta =', eta, 'samples =', samples)
@@ -156,8 +167,8 @@ def run_experiment(eta, steps, samples, D, Q):
 
     result = []
     max_error = avg_error = 0
-    for query in Q:
-        diff = query_3marginal_db_cached(query) \
+    for query in Qtest:
+        diff = query_3marginal_db_cached(query, test_qcache) \
                - query_3marginal_db(synthetic_db, query)
         max_error = max(max_error, abs(diff))
         avg_error += abs(diff)
@@ -199,12 +210,19 @@ def average_nexperiments(n, start_time, **args):
 
         log.write(json.dumps(dump, sort_keys=True) + '\n')
 
-def cache_results(D, Q):
-    c = cache
+def cache_results(D, Q, Qtest):
+    test_cache = test_qcache
+    training_cache = training_qcache
+
     i = 1
-    n = len(Q)
+    n = len(Q) + len(Qtest)
+
     for query in Q:
-        c[query] = query_3marginal_db(D, query)
+        training_cache[query] = query_3marginal_db(D, query)
+        print('query {}/{}'.format(i, n), end='\r', flush=True)
+        i += 1
+    for query in Qtest:
+        test_cache[query] = query_3marginal_db(D, query)
         print('query {}/{}'.format(i, n), end='\r', flush=True)
         i += 1
     print()
@@ -247,27 +265,28 @@ if __name__ == '__main__':
     D = load(open(pickle_file, 'rb'))
     n = len(D)
     nbits = len(D[0])
-    nqueries = 1000
+    nqueries = 10000
     print('n = {}, nbits = {}, nqueries = {}'.format(n, nbits, nqueries))
 
     cachefile = 'qcache_r-{}_c-{}_q-{}.p'.format(n, nbits, nqueries)
     if Path(cachefile).exists():
         print('Found cache file: {}'.format(cachefile))
         start = time()
-        cache = load(open(cachefile, 'rb'))
-        Q = list(cache.keys())
+        training_qcache, test_qcache = load(open(cachefile, 'rb'))
+        Q = list(training_qcache.keys())
+        Qtest = list(test_qcache.keys())
         print('Read cache file in {}s'.format(time() - start))
     else:
         print('Generating queries...')
         start = time()
-        Q = get_queries(nqueries, nbits)
+        Q, Qtest = get_queries(nqueries, nbits)
         print('Created queries in {}s'.format(time() - start))
         print('Creating cache...')
         start = time()
-        cache_results(D, Q)
+        cache_results(D, Q, Qtest)
         print('Generated cache in {}s'.format(time() - start))
         with open(cachefile, 'wb') as cf:
-            dump(cache, cf)
+            dump([training_qcache, test_qcache], cf)
 
     t = strftime('%m-%d-%H-%M-%S')
     eta = 0.1
@@ -277,7 +296,7 @@ if __name__ == '__main__':
     steps_list = calculate_nsteps(0.1, 5.0, 15, eta, samples, n)
     for steps in steps_list:
         average_nexperiments(3, t, eta=eta, steps=steps,
-                             samples=samples, D=D, Q=Q)
+                             samples=samples, D=D, Q=Q, Qtest=Qtest)
 
     '''
     eta = 2.7                   # fixed for now
