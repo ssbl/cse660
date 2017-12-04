@@ -282,13 +282,13 @@ def average_nexperiments(n, start_time, **kwargs):
     # write to log file
     with open('log_{}.json'.format(start_time), 'a') as log:
         dump = {
-            'steps': args['steps'],
-            'eta': args['eta'],
-            'samples': args['samples'],
+            'steps': kwargs['steps'],
+            'eta': kwargs['eta'],
+            'samples': kwargs['samples'],
             'max_error': max_error,
             'avg_error': avg_error,
             'runtime': runtime,
-            'n': len(args['D'])
+            'n': len(kwargs['D'])
         }
 
         log.write(json.dumps(dump, sort_keys=True) + '\n')
