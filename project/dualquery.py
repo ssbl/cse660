@@ -1,95 +1,137 @@
+""" This is the main code for Dual Query Algorithm"""
 import itertools
 import json
 from pathlib import Path
 from pickle import dump, load
-from pprint import pprint, pformat
 from sys import argv
 from time import time, strftime
 
 import pulp
 import numpy as np
-import matplotlib.pyplot as plt
 
 
 training_qcache = {}
 test_qcache = {}
 
-def create_dataset(n,nbits):
-    columns = []
-    for i in range(nbits):
-        columns.append(np.random.randint(2, size=n))
 
-    D = list(zip(*columns))
+def create_dataset(n, nbits):
+    """ Create Synthetic Dataset
+
+    Args:
+        n: Number of rows in dataset
+        nbits: Number of columns in dataset
+
+    Returns:
+        The dataset as a list of lists. 
+    """
+    D = []
+    for _ in range(n):
+        # generate 1 row
+        D.append(np.random.randint(2, size=nbits))
+
     return D
 
-def create_queries(nqueries, nbits):
-    # [sign col1 col2 col3 compl1 compl2 compl3]
-    signs = [0, 1]
-    columns = itertools.combinations(range(nbits), 3)
-    # result = [[1 if i-1 in c else 0 for i in range(nbits+1)]
-    #           for c in itertools.islice(columns, nqueries)]
-    complements = itertools.product(range(2), repeat=3)
-    # for i in range(len(result)):
-    #     negated = result[i][:]
-    #     negated[0] = 1
-    #     result.append(negated)
-    result = itertools.product(columns, complements)
-    result = list(itertools.product(signs, result))
-    return [[x[0]] + list(itertools.chain(*x[1])) for x in result]
-
-def get_frequencies(D, nbits):
-    result = [0 for _ in range(2**nbits)]
-    for x in D:
-        result[int(''.join(map(str, x)), 2)] += 1 / len(D)
-    return result
-
 def nC3(n):
+    """ Computes n choose 3 """    
     return (n * (n-1) * (n-2)) // 6
 
 def sample_queries(Q, Qdist, samples):
+    """ Sample the queries from Query set according to the Query Distribution
+
+    Args:
+        Q: Query set
+        Qdist: Query Distribution
+        samples: Number of queries to be sampled
+
+    Returns:
+        List of sampled queries
+    """    
     result = []
+    # since np.random.choice can only sample from 1D array, we use indices
     queries = list(range(len(Q)))
-    for i in range(int(samples)):
+    for _ in range(int(samples)):
+        # pick a random index based on Qdist and take the query at that index
         result.append(Q[np.random.choice(queries, p=Qdist)])
     return result
 
-# def query_3marginal(row, query):
-#     if np.dot(row, query[1:]) == 3:
-#         return 0 if query[0] else 1
-#     return 1 if query[0] else 0
-
 def query_3marginal(row, query):
+    """ Run a 3 marginal query on a row
+
+    Args:
+        row: row from dataset
+        query: query to run
+
+    Returns:
+        1 if row satisfies query, 0 otherwise
+    """    
     result = 1
+    # Query Format: {sign, column1, column2, column3, complement1, complement2, complement3}
+    # run for each column
     for i in range(3):
+        # get column number
         col = query[1 + i]
+        # get corresponding complement bit (1 if complement 0 if not)
         complement = query[4 + i]
+        # the result is 1 only if the bit at column and complement bit differ
+        # this can be done by taking XOR
         result &= int(row[col]) ^ complement
+    # flip the result if sign bit is set otherwise don't
     return result ^ 1 if query[0] else result
 
 def query_3marginal_db(D, query):
+    """ Run a 3 marginal query on Dataset
+
+    Args:
+        D: Dataset
+        query: query to run
+
+    Returns:
+        Normalized result between 0 and 1
+    """    
+    # run query on each row and normalize the result
     return sum([query_3marginal(row, query) for row in D]) / len(D)
 
 def query_3marginal_db_cached(query, cache):
+    """ Run a 3 marginal query on Dataset using cache
+
+    Args:
+        query: query to run
+        cache: a cached dictionary mapping query to corresponding result on dataset
+
+    Returns:
+        Normalized result between 0 and 1
+    """    
     return cache[query]
 
 def payoff(D, q, x):
+    """ Calculate payoff using equation q(x) - q(D)
+
+    Args:
+        D: Dataset
+        q: query to run
+        x: a row from dataset
+
+    Returns:
+        payoff between -1 and 1
+    """    
     return query_3marginal(x, q) - query_3marginal_db_cached(q, training_qcache)
 
-def print_result(x, c, d):
-    for xvar in x:
-        print(xvar.varValue)
-    print('=== c ===')
-    for cvar in c:
-        print(cvar.varValue)
-    print('=== d ===')
-    for dvar in d:
-        print(dvar.varValue)
-
 def get_queries(nqueries, nbits):
+    """ Generate random 3-Marginal queries
+    Query Format: {sign, column1, column2, column3, complement1, complement2, complement3}
+
+    Args:
+        nqueries: number of queries to be generated
+        nbits: number of columns in dataset
+
+    Returns:
+        Two lists of queries, first for training(70%) and second for testing(30%)
+    """    
     result = []
 
     signs = [0, 1]
     columns = set()
+    # generate unique triplet of unique columns
     while len(columns) < nqueries:
         triple = set()
         while len(triple) < 3:
@@ -97,22 +139,45 @@ def get_queries(nqueries, nbits):
         triple = sorted(triple)
         columns.add(tuple(triple))
 
+    # split column set into training(70%) and test(30%)
     columns = list(columns)
     split_index = int(0.7 * nqueries)
-    test, training = columns[:split_index], columns[split_index:]
+    training, test = columns[:split_index], columns[split_index:]
 
-    results = [test, training]
+    
+    results = [training, test]
     for i in range(len(results)):
         datasplit = results[i]
+        # generate all complements [0 0 0] to [1 1 1]
         complements = itertools.product(range(2), repeat=3)
+        # take cross product of datasplit with complement to concatenate
+        # each row of complement to each triplet in datasplit
         result = itertools.product(datasplit, complements)
+        # do similar procedure to concatenate sign with result,
         result = list(itertools.product(signs, result))
+        # currently each element in result is not flattened but is a list of tuples
+        # Now flatten each element in the result so that it conforms to query format
         results[i] = [tuple([x[0]] + list(itertools.chain(*x[1]))) for x in result]
 
     return results[0], results[1]
 
 def run_experiment(eta, steps, samples, D, Q, Qtest):
+    """ Execute a single run of the algorithm for given parameters
+
+    Args:
+        eta: learning rate eta
+        steps: number of iterations / number of rows generated in output dataset
+        samples: number of queries to be sampled from query set
+        D: Original Dataset
+        Q: Query set
+        Qtest: Set of queries to test accuracy
+
+    Returns:
+        A dictionary of average error, max error and runtime
+    """    
+
     n = len(D)
+    # initialize Query distribution as uniform distribution
     Qdist = np.array([1/len(Q) for _ in range(len(Q))])
     print('steps =', steps, 'eta =', eta, 'samples =', samples)
 
@@ -122,6 +187,7 @@ def run_experiment(eta, steps, samples, D, Q, Qtest):
         print('step {:3d}/{}'.format(t + 1, steps), end='\r', flush=True)
         sampled_queries = np.array(sample_queries(Q, Qdist, samples))
 
+        # count number of positive and negative queries
         npositive = nnegative = 0
         for query in sampled_queries:
             if query[0]:
@@ -129,6 +195,7 @@ def run_experiment(eta, steps, samples, D, Q, Qtest):
             else:
                 npositive += 1
 
+        # create model and variables for the model
         model = pulp.LpProblem('Dual Query', pulp.LpMaximize)
         x = np.array([pulp.LpVariable('x' + str(i), cat='Binary') for i in range(nbits)])
         c = np.array([pulp.LpVariable('c' + str(i), cat='Binary') for i in range(npositive)])
@@ -136,35 +203,42 @@ def run_experiment(eta, steps, samples, D, Q, Qtest):
 
         model += sum(c) + sum(d), 'Objective function'
 
-        countp = countn = 0
+        # go through each sampled query and add a constraint to the model
+        # depending on the type of query
+
+
+        countp = countn = 0  #used for tracking index of c and d variables
         for query in sampled_queries:
             vars = []
             for i in range(3):
                 col = query[1 + i]
                 complement = query[4 + i]
                 vars.append(1 - x[col] if complement else x[col])
-            if not query[0]:
+            if not query[0]:    # query is positive
                 model += sum(vars) - 3 * c[countp] >= 0
                 countp += 1
             else:
                 model += -sum(vars) - d[countn] + 3 >= 0
                 countn += 1
+        # run the solver
         model.solve()
 
-        # Using valueOrDefault to avoid dealing with None values in xt
+        # Using valueOrDefault, free variable with value None are set to 0
         xt = np.array([xvar.valueOrDefault() for xvar in x])
 
+        # update the query distribution and normalize
         for i in range(len(Q)):
             Qdist[i] = np.exp(-eta * payoff(D, Q[i], xt)) * Qdist[i]
         psum = sum(Qdist)
-
         Qdist /= psum
 
+        # add this row to synthetic dataset
         synthetic_db.append(xt)
 
     print()
     runtime = time() - start
 
+    # calculate maximum error and average error
     result = []
     max_error = avg_error = 0
     for query in Qtest:
@@ -181,14 +255,22 @@ def run_experiment(eta, steps, samples, D, Q, Qtest):
         'runtime': runtime
     }
 
-def average_nexperiments(n, start_time, **args):
+def average_nexperiments(n, start_time, **kwargs):
+    """ Run the algorithm for multiple runs and log the average of results
+
+    Args:
+        n: number of runs
+        start_time: start_time used for logging
+        **kwargs: keyword arguments for run_experiment
+    """    
     avg_error = 0
     max_error = 0
     runtime = 0
 
+    # run experiment for n number of runs
     for i in range(1, n + 1):
         print('run {}'.format(i))
-        result = run_experiment(**args)
+        result = run_experiment(**kwargs)
         avg_error += result['average']
         max_error += result['max']
         runtime += result['runtime']
@@ -197,6 +279,7 @@ def average_nexperiments(n, start_time, **args):
     avg_error /= n
     runtime /= n
 
+    # write to log file
     with open('log_{}.json'.format(start_time), 'a') as log:
         dump = {
             'steps': args['steps'],
@@ -211,6 +294,15 @@ def average_nexperiments(n, start_time, **args):
         log.write(json.dumps(dump, sort_keys=True) + '\n')
 
 def cache_results(D, Q, Qtest):
+    """ Generating cache for Query set and Test Query set using Dataset
+    saves results to global variables training_qcache and test_qcache
+
+    Args:
+        D: Dataset
+        Q: Query set
+        Qtest: Test Query set
+    """    
+    # avoid global lookups for performance
     test_cache = test_qcache
     training_cache = training_qcache
 
@@ -227,24 +319,26 @@ def cache_results(D, Q, Qtest):
         i += 1
     print()
 
-def calculate_nsamples(eps_min, eps_max, eps_steps, eta, steps, nrows):
-    eps_increment = (eps_max - eps_min) / (eps_steps - 1)
+def calculate_nsteps(eps_min, eps_max, step_count, eta, samples, nrows):
+    """ Calculate `step_count` number of steps for a given range of epsilon
+    using given parameters
 
-    result = []
+    Args:
+        eps_min: lower bound of epsilon
+        eps_max: upper bound of epsilon
+        step_count: number to steps to calculate
+        eta: learning rate eta
+        samples: number of samples used in algorithm
+        nrows: number of rows in original dataset
 
-    for i in range(eps_steps):
-        current_eps = eps_min + i * eps_increment
-        s = (current_eps * nrows) / (eta * steps * (steps - 1))
-        result.append(s)
-
-    return result
-
-def calculate_nsteps(eps_min, eps_max, eps_steps, eta, samples, nrows):
-    eps_increment = (eps_max - eps_min) / (eps_steps - 1)
+    Returns:
+        a list of generated step values
+    """    
+    eps_increment = (eps_max - eps_min) / (step_count - 1)
 
     result = set()
 
-    for i in range(eps_steps):
+    for i in range(step_count):
         current_eps = eps_min + i * eps_increment
         x = (current_eps * nrows) / (eta * samples)
         T1, T2 = np.roots([1, -1, -x]).real
@@ -258,7 +352,8 @@ def calculate_nsteps(eps_min, eps_max, eps_steps, eta, samples, nrows):
 if __name__ == '__main__':
     argc = len(argv)
     if argc != 2:
-        print('usage: dualquery <pickle-file>')
+        print('usage: dualquery <pickle-file>\npickle-file contains original'
+            ' binary dataset as list of lists')
         exit(1)
 
     pickle_file = argv[1]
@@ -269,6 +364,7 @@ if __name__ == '__main__':
     print('n = {}, nbits = {}, nqueries = {}'.format(n, nbits, nqueries))
 
     cachefile = 'qcache_r-{}_c-{}_q-{}.p'.format(n, nbits, nqueries)
+    # if cache file exists load it, otherwise create cache file and save it
     if Path(cachefile).exists():
         print('Found cache file: {}'.format(cachefile))
         start = time()
@@ -288,32 +384,14 @@ if __name__ == '__main__':
         with open(cachefile, 'wb') as cf:
             dump([training_qcache, test_qcache], cf)
 
+
     t = strftime('%m-%d-%H-%M-%S')
     eta = 0.1
-    # steps = 200
-    # samples_list = calculate_nsamples(0.1, 5.0, 15, eta, steps, n)
     samples = 50
-    steps_list = calculate_nsteps(0.1, 5.0, 15, eta, samples, n)
+    # get list of steps variable
+    steps_list = calculate_nsteps(eps_min=0.1, eps_max=5.0, step_count=15,
+                                eta=eta, samples=samples, nrows=n)
+
     for steps in steps_list:
         average_nexperiments(3, t, eta=eta, steps=steps,
                              samples=samples, D=D, Q=Q, Qtest=Qtest)
-
-    '''
-    eta = 2.7                   # fixed for now
-    steps = 12
-    steps_max = 80
-    steps_increment = 4
-    samples = 30
-    samples_max = 75
-    samples_increment = 13
-    # steps = 10
-    # steps_max = 22
-    # samples = 5
-    # samples_max = 20
-
-    # run_experiment(eta=eta, steps=steps, samples=samples, D=D, Q=Q, start_time=t)
-    for T in range(steps, steps_max + 1, steps_increment):
-        for s in range(samples, samples + 1, samples_increment):
-            # run_experiment(eta=eta, steps=T, samples=s, D=D, Q=Q, start_time=t)
-            average_nexperiments(3, t, eta=eta, steps=T, samples=s, D=D, Q=Q)
-    '''
