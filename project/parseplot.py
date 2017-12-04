@@ -1,9 +1,19 @@
+"""This module contains code for parsing and plotting experiment results."""
+
 import json
 from sys import argv, stderr
 
 import matplotlib.pyplot as plt
 
 def parse(pathlist):
+    """Parse a list of json files containing experiment results.
+
+    Args:
+        pathlist: a list of json files.
+
+    Returns:
+        epsilon, maximum error and average error.
+    """
     epsilon = []
     max_error = []
     avg_error = []
@@ -23,9 +33,6 @@ def parse(pathlist):
 
     return epsilon, max_error, avg_error
 
-def plot_error(epsilon, error):
-    plt.plot(epsilon, error, 'go')
-
 if __name__ == '__main__':
     argc = len(argv)
     if argc <= 1:
@@ -34,8 +41,10 @@ if __name__ == '__main__':
 
     files = argv[1:]
     epsilon, max_error, avg_error = parse(files)
-    sort_eps = sorted(zip(epsilon,max_error,avg_error), key = lambda x:x[0])
-    epsilon,max_error,avg_error =  zip(*sort_eps)
+
+    # Sort the data by epsilon.
+    sort_eps = sorted(zip(epsilon, max_error, avg_error), key=lambda x: x[0])
+    epsilon, max_error, avg_error =  zip(*sort_eps)
 
     max_error_plot = plt.figure(1)
     plt.plot(epsilon, max_error, '-go')
