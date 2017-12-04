@@ -34,6 +34,8 @@ if __name__ == '__main__':
 
     files = argv[1:]
     epsilon, max_error, avg_error = parse(files)
+    sort_eps = sorted(zip(epsilon,max_error,avg_error), key = lambda x:x[0])
+    epsilon,max_error,avg_error =  zip(*sort_eps)
 
     max_error_plot = plt.figure(1)
     plt.plot(epsilon, max_error, '-go')
