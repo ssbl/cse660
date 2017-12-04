@@ -25,7 +25,6 @@ def parse(pathlist):
 
 def plot_error(epsilon, error):
     plt.plot(epsilon, error, 'go')
-    plt.show()
 
 if __name__ == '__main__':
     argc = len(argv)
@@ -35,4 +34,16 @@ if __name__ == '__main__':
 
     files = argv[1:]
     epsilon, max_error, avg_error = parse(files)
-    plot_error(epsilon, max_error)
+
+    max_error_plot = plt.figure(1)
+    plt.plot(epsilon, max_error, '-go')
+    plt.xlabel('epsilon')
+    plt.ylabel('max error')
+
+    avg_error_plot = plt.figure(2)
+    plt.plot(epsilon, avg_error, '-go')
+    plt.xlabel('epsilon')
+    plt.ylabel('average error')
+    max_error_plot.show()
+    avg_error_plot.show()
+    input()
