@@ -1,3 +1,4 @@
+""" This module extracts a part of data from full netflix data file fdb.p"""
 import bitarray
 from pickle import load, dump
 from pprint import pprint
